@@ -222,6 +222,30 @@ app.put('/api/catches/:catchId/process', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+/**
+ * PUT /api/catches/:catchId/wholesale
+ * Adds wholesale details to a catch batch.
+ * Expects body: { "wholesalePrice": ..., "batchSplitDetails": "..." }
+ */
+app.put('/api/catches/:catchId/wholesale', async (req, res) => {
+    const { catchId } = req.params;
+    const { wholesalePrice, batchSplitDetails } = req.body;
+    console.log(`PUT /api/catches/${catchId}/wholesale received with body:`, req.body);
+
+    if (!wholesalePrice || !batchSplitDetails) {
+        return res.status(400).json({ error: 'Missing required wholesale fields.' });
+    }
+
+    try {
+        const { contract } = await getContract();
+        const result = await contract.submitTransaction('addWholesaleDetails', catchId, wholesalePrice.toString(), batchSplitDetails);
+        res.json({ status: 'success', message: result.toString() });
+    } catch (error) {
+        console.error(`Failed to add wholesale details: ${error}`);
+        res.status(500).json({ error: error.message });
+    }
+});
 // Start the server
 const server = app.listen(port, () => {
   console.log(
