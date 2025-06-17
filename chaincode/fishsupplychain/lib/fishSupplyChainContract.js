@@ -84,6 +84,7 @@ class FishSupplyChainContract extends Contract {
       owner: vessel.owner, // The vessel owner is the initial owner of the catch
       assetStatus: 'CAUGHT', // Initial status
       processingDetails: {}, // Placeholder for processor data
+      wholesalerDetails: {}, // NEW: Placeholder for wholesaler data
     };
 
     await ctx.stub.putState(catchId, Buffer.from(JSON.stringify(catchRecord)));
@@ -138,6 +139,8 @@ class FishSupplyChainContract extends Contract {
         catchRecord.assetStatus = 'IN_PROCESS';
     } else if (catchRecord.assetStatus === 'IN_PROCESS') {
         catchRecord.assetStatus = 'WHOLESALE';
+    } else if (catchRecord.assetStatus === 'WHOLESALE') { 
+    catchRecord.assetStatus = 'RETAIL'; // The next logical step
     }
 
     await ctx.stub.putState(catchId, Buffer.from(JSON.stringify(catchRecord)));
@@ -169,6 +172,36 @@ class FishSupplyChainContract extends Contract {
     await ctx.stub.putState(catchId, Buffer.from(JSON.stringify(catchRecord)));
     return `Processing details added to catch ${catchId}`;
   }
+  // NEW: Function for a wholesaler to add their data
+async addWholesaleDetails(ctx, catchId, wholesalePrice, batchSplitDetails) {
+  console.info(`Adding wholesale details to catch ${catchId}`);
+
+  const catchJSON = await ctx.stub.getState(catchId);
+  if (!catchJSON || catchJSON.length === 0) {
+    throw new Error(`Catch ${catchId} does not exist.`);
+  }
+  const catchRecord = JSON.parse(catchJSON.toString());
+
+  // Access Control: Check if the asset is in the correct state
+  if (catchRecord.assetStatus !== 'WHOLESALE') {
+      throw new Error(`Catch ${catchId} is not in 'WHOLESALE' state. Current state: ${catchRecord.assetStatus}`);
+  }
+
+  // A more robust check would use the client's full identity from their MSP
+  // const submitterMspId = ctx.clientIdentity.getMSPID();
+  // if (submitterMspId !== 'WholesalerOrgMSP') {
+  //     throw new Error(`Caller is not from the Wholesaler organization.`);
+  // }
+
+  catchRecord.wholesalerDetails = {
+    wholesalePricePerKg: parseFloat(wholesalePrice),
+    batchSplitDetails: batchSplitDetails, // e.g., "Split into 3 lots for retailers A, B, C"
+    wholesaleTimestamp: new Date(ctx.stub.getTxTimestamp().seconds * 1000).toISOString(),
+  };
+
+  await ctx.stub.putState(catchId, Buffer.from(JSON.stringify(catchRecord)));
+  return `Wholesale details added to catch ${catchId}`;
+}
 }
 
 module.exports = FishSupplyChainContract;
